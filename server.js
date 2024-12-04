@@ -1,7 +1,7 @@
 // Configure environment variables
 import { config } from "dotenv";
-import { WebSocket } from "ws";
 config();
+console.log(process.env.MODE)
 
 // Set up the server connection with Pocket Option
 import { io } from "socket.io-client";
@@ -11,14 +11,13 @@ const server = io(
     : process.env.LIVE_SERVER,
   {
     extraHeaders: {
-      Origin: process.env.ORIGIN,
+      origin: process.env.ORIGIN,
     },
     transports: ["websocket"],
   }
 );
 
-// Modify the on event to parse the incoming data
-let client = null;
+/*----------- MODIFY SERVER EVENTS ----------------*/
 const on = server.on.bind(server);
 server.on = (event, callback) => {
   on(event, (...args) => {
@@ -35,7 +34,7 @@ server.on = (event, callback) => {
   });
 };
 
-// Required server incoming events
+/*----------- SERVER EVENTS ----------------*/
 const inboundEvents = [
   "connect", "disconnect", "successauth",
   "updateStream", "updateHistoryNew", "loadHistoryPeriod",
@@ -44,23 +43,48 @@ const inboundEvents = [
   "updateHistory", "connect_error", "reconnect_error",
   "reconnect_failed", "updateBalance", "price-alert/load", "favorite/load",
   "updateClosedDeals", "updateOpenedDeals"
-], outboundEvents = [
-  "changeSymbol", "auth", "loadHistoryPeriod",
-  "openOrder", "cancelOrder", "favorite/change",
-  "price-alert/add", "price-alert/remove"
-]
-
+];
+let isAuthenticated = false;
 for (let index = 0; index <= inboundEvents.length - 1; index++) {
   server.on(inboundEvents[index], (message) => {
-    console.log(inboundEvents[index], message, inboundEvents[index] === "connect");
-    if (inboundEvents[index] === "connect") {
-      const auth_data = {isDemo: process.env.MODE == "demo" ? 1 : 0,
-          session: process.env.MODE == "demo" ? process.env.DEMO_AUTH : process.env.LIVE_AUTH,
-          platform: Number(process.env.PLATFORM),
-          uid: Number(process.env.AUTH_UID)};
-        server.emit("auth", auth_data); 
-    } if (inboundEvents[index] === "successauth") {
+    console.log("Received server event:", inboundEvents[index], message);
+    if (inboundEvents[index] !== "connect" && inboundEvents[index] !== "disconnect") {
+      if (client && client.connected) {
+        client.emit(inboundEvents[index], message);
+      }
+
+      if (inboundEvents[index] == "successauth") {
+        isAuthenticated = true;
+      }
+    } else if (inboundEvents[index] === "connect") {
+      // Meaning that we have been prevously disconnected, now a new connection has been made.
+      if (isAuthenticated) {
+        client.emit("connected", {id: server.id});
+      }
+    } else if (inboundEvents[index] == "disconnect") {
+      server.connect();
     }
   });
+}
+
+
+/*----------- CLIENT EVENTS ----------------*/
+const outboundEvents = [
+  "connect", "disconnect", "favorite/change",
+  "changeSymbol", "auth", "loadHistoryPeriod",
+  "openOrder", "cancelOrder", "price-alert/add",
+  "price-alert/remove"
+]
+let client = io("http://localhost:5000");
+for (let j_index = 0; j_index <= outboundEvents.length-1; j_index++) {
+  // When client sends messages most of them should be forwarded to the server.
+  client.on(outboundEvents[j_index], (message) => {
+    if (outboundEvents[j_index] !== "connect" && outboundEvents[j_index] !== "disconnect") {
+      console.log("Received client event", outboundEvents[j_index], message);
+      server.emit(outboundEvents[j_index], message);
+    } else if (outboundEvents[j_index] == "connect") {
+      client.emit("connected", {id: server.id});
+    }
+  })
 }
 
