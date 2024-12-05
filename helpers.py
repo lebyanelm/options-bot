@@ -104,18 +104,25 @@ atexit.register(cleanup_routine)
 # Get latest historical data
 def load_candles(asset_id: str) -> dict:
     rand = str(random.randint(10, 99))
-    cu = int(time.time())
+    cu = time.time()
     t = str(cu + (2 * 60 * 60))
-    index = int(t + rand)
-    end_time = (timesync.get_synced_datetime() - datetime.timedelta(hours=2, minutes=58)).timestamp()
+    index = t + rand
     period = config["PERIOD"]
+    time_sync = timesync.get_synced_time()
+    time_red = last_time(time_sync, period)
+    offset = get_period_offset(period)
     return dict(
         asset = asset_id,
         index = index,
-        offset = get_period_offset(period),
+        offset = offset,
         period = period,
-        time = int(end_time)
-    )
+        time = time_red
+    )   
+    
+
+def last_time(timestamp, period):
+    timestamp_redondeado = (timestamp // period) * period
+    return timestamp_redondeado
     
     
 def get_period_offset(period):

@@ -19,7 +19,8 @@
 
     "MONGODB": "mongodb+srv://lebyanelm:Hzk9cbBGSN2cbqld@pocketoption-bot.xhuos.mongodb.net/?retryWrites=true&w=majority&appName=pocketoption-bot",
 
-    "TARGET_SYMBOLS": ["#TSLA_otc", "#AAPL_otc"],
-    "PERIOD": 60,
-    "EXPIRY": 1
+    "TARGET_SYMBOLS": ["#AAPL_otc"],
+    "PERIOD": 30,
+    "EXPIRY": 1,
+    "CANDLES_LIMIT": 3600
 }
