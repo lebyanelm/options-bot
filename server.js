@@ -61,7 +61,7 @@ const inboundEvents = [
 let isAuthenticated = false;
 for (let index = 0; index <= inboundEvents.length - 1; index++) {
   server.on(inboundEvents[index], (message) => {
-    console.log("Received server event:", inboundEvents[index], message);
+    console.log("Received server event:", inboundEvents[index], message, true);
     const reservedEventNames = ["connect", "disconnect", "connect_error"]
     if (!reservedEventNames.includes(inboundEvents[index])) {
       if (client && client.connected) {

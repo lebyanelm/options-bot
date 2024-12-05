@@ -3,6 +3,10 @@ import logging
 import json
 import asyncio
 import atexit
+import random
+import time
+import datetime
+from time_sync import timesync
 from pymongo import MongoClient
 from aiohttp import web
 
@@ -97,8 +101,45 @@ def cleanup_routine():
 atexit.register(cleanup_routine)
 
 
+# Get latest historical data
+def load_candles(asset_id: str) -> dict:
+    rand = str(random.randint(10, 99))
+    cu = int(time.time())
+    t = str(cu + (2 * 60 * 60))
+    index = int(t + rand)
+    end_time = (timesync.get_synced_datetime() - datetime.timedelta(hours=2, minutes=58)).timestamp()
+    period = config["PERIOD"]
+    return dict(
+        asset = asset_id,
+        index = index,
+        offset = get_period_offset(period),
+        period = period,
+        time = int(end_time)
+    )
+    
+    
+def get_period_offset(period):
+    if (period == 5): return 1_000;
+    if (period == 10): return 2_000;
+    if (period == 15): return 3_000;
+    if (period == 30): return 6_000;
+    if (period == 60): return 9_000;
+    if (period == 120): return 18_000;
+    if (period == 180): return 27_000;
+    if (period == 300): return 45_000;
+    if (period == 600): return 90_000;
+    if (period == 900): return 135_000;
+    if (period == 1_800): return 270_000;
+    if (period == 3_600): return 540_000;
+    if (period == 14_400): return 2_160_000;
+    if (period == 86_4000): return 12_960_000;
+    return 0;
+    
+
 # Configure the helper module
 config = load_config()
 logging_level = logging.DEBUG if config["VERBOSITY"] == "debug" else logging.INFO
+if config["VERBOSITY"] == "":
+    logging_level = logging.ERROR
 logging.basicConfig(format='Bot - %(asctime)s - %(levelname)s - %(message)s',
                     level=logging_level)

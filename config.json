@@ -2,7 +2,7 @@
     "APP_NAME": "pocketoption-bot",
     "MODE": "demo",
     "PLATFORM": 3,
-    "VERBOSITY": "info",
+    "VERBOSITY": "",
 
     "LIVE_SERVER": "https://api-eu.po.market",
     "DEMO_SERVER": "https://demo-api-eu.po.market",
@@ -19,7 +19,7 @@
 
     "MONGODB": "mongodb+srv://lebyanelm:Hzk9cbBGSN2cbqld@pocketoption-bot.xhuos.mongodb.net/?retryWrites=true&w=majority&appName=pocketoption-bot",
 
-    "TARGET_SYMBOLS": "#TSLA_otc,#AAPL_otc",
+    "TARGET_SYMBOLS": ["#TSLA_otc", "#AAPL_otc"],
     "PERIOD": 60,
     "EXPIRY": 1
 }
