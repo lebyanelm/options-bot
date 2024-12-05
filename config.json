@@ -19,8 +19,9 @@
 
     "MONGODB": "mongodb+srv://lebyanelm:Hzk9cbBGSN2cbqld@pocketoption-bot.xhuos.mongodb.net/?retryWrites=true&w=majority&appName=pocketoption-bot",
 
-    "TARGET_SYMBOLS": ["#AAPL_otc"],
+    "TARGET_SYMBOLS": ["AUDUSD_otc"],
     "PERIOD": 30,
     "EXPIRY": 1,
-    "CANDLES_LIMIT": 3600
+    "CANDLES_LIMIT": 6000,
+    "BALANCE_AT_RISK": 0.05
 }

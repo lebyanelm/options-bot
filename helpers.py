@@ -2,6 +2,7 @@
 import logging
 import json
 import asyncio
+import socketio
 import atexit
 import random
 import time
@@ -28,7 +29,8 @@ def load_config():
         with open("config.json", 'r') as config_file:
             config = json.load(config_file)
     except Exception as error:
-        print(error)
+        logging.error(error)
+    config["BALANCE"] = 0
     return config
 
     
@@ -92,7 +94,7 @@ def cleanup_routine():
     global node_process
     if node_process is not None:
         try:
-            if node_process.poll() is None:  # Check if Node.js process is still running
+            if node_process is not None:  # Check if Node.js process is still running
                 node_process.terminate()
                 logging.info("Node.js script terminated.")
         except Exception as e:
@@ -102,14 +104,14 @@ atexit.register(cleanup_routine)
 
 
 # Get latest historical data
-def load_candles(asset_id: str) -> dict:
-    rand = str(random.randint(10, 99))
-    cu = time.time()
-    t = str(cu + (2 * 60 * 60))
-    index = t + rand
+def load_candles(asset_id: str, _time = None) -> dict:
+    index = get_random_request_id()
     period = config["PERIOD"]
-    time_sync = timesync.get_synced_time()
-    time_red = last_time(time_sync, period)
+    if _time is None:
+        time_sync = timesync.get_synced_time()
+        time_red = last_time(time_sync, period)
+    else:
+        time_red = _time
     offset = get_period_offset(period)
     return dict(
         asset = asset_id,
@@ -141,6 +143,34 @@ def get_period_offset(period):
     if (period == 14_400): return 2_160_000;
     if (period == 86_4000): return 12_960_000;
     return 0;
+    
+    
+async def add_price_alert(sio: socketio.AsyncServer, asset_id: str, price: float):
+    await sio.emit("price-alert/add", dict(price=price, assetId=asset_id))
+    
+
+def get_order_params(asset_id: str, order_type: str) -> dict:
+    request_id = get_random_request_id()
+    timezone_offset = datetime.timedelta(hours=2)
+    expiry_offset = datetime.timedelta(minutes=config["EXPIRY"])
+    now = datetime.datetime.now()
+    close_at = (now + timezone_offset) + expiry_offset
+    return dict(
+        asset = asset_id,
+        requestId = request_id,
+        optionType = 100,
+        isDemo = 1 if config["MODE"] == "demo" else 0,
+        action = order_type,
+        amount = config["BALANCE"] * config["BALANCE_AT_RISK"],
+        closeAt = close_at.timestamp()
+    )
+
+    
+def get_random_request_id():
+    rand = str(random.randint(10, 99))
+    cu = time.time()
+    t = str(cu + (2 * 60 * 60))
+    return int(float(t + rand))
     
 
 # Configure the helper module
