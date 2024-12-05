@@ -1,7 +1,7 @@
 {
   "name": "options-bot",
   "version": "1.0.0",
-  "type": "module",
+  "type": "commonjs",
   "description": "Packages for Socket.IO proxy server.",
   "main": "proxy_server.js",
   "scripts": {

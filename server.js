@@ -1,17 +1,31 @@
 // Configure environment variables
-import { config } from "dotenv";
-config();
-console.log(process.env.MODE)
+const config = require("./config.json")
+
+/*------ MODIFY THE LOG METHOD -------------*/
+const log = console.log.bind(console)
+console.log = (...message) => {
+  let force = false;
+  if (typeof message[message.length-1] === "boolean") {
+    if (message[message.length-1] === true) {
+      force = true;
+      message = message.slice(0, message.length-1);
+    }
+  }
+  if (config.VERBOSITY === "debug" || force === true) {
+    log(...message)
+  }
+}
+console.log("Trading mode:", config.MODE, true)
 
 // Set up the server connection with Pocket Option
-import { io } from "socket.io-client";
-const server = io(
-  process.env.MODE == "demo"
-    ? process.env.DEMO_SERVER
-    : process.env.LIVE_SERVER,
+const socketio = require("socket.io-client")
+const server = socketio.io(
+  config.MODE == "demo"
+    ? config.DEMO_SERVER
+    : config.LIVE_SERVER,
   {
     extraHeaders: {
-      origin: process.env.ORIGIN,
+      origin: config.ORIGIN,
     },
     transports: ["websocket"],
   }
@@ -48,7 +62,8 @@ let isAuthenticated = false;
 for (let index = 0; index <= inboundEvents.length - 1; index++) {
   server.on(inboundEvents[index], (message) => {
     console.log("Received server event:", inboundEvents[index], message);
-    if (inboundEvents[index] !== "connect" && inboundEvents[index] !== "disconnect") {
+    const reservedEventNames = ["connect", "disconnect", "connect_error"]
+    if (!reservedEventNames.includes(inboundEvents[index])) {
       if (client && client.connected) {
         client.emit(inboundEvents[index], message);
       }
@@ -63,6 +78,9 @@ for (let index = 0; index <= inboundEvents.length - 1; index++) {
       }
     } else if (inboundEvents[index] == "disconnect") {
       server.connect();
+    } else if (inboundEvents[index] == "connect_error") {
+      client.emit("connection_error", message);
+      server.connect(); 
     }
   });
 }
@@ -75,7 +93,7 @@ const outboundEvents = [
   "openOrder", "cancelOrder", "price-alert/add",
   "price-alert/remove"
 ]
-let client = io("http://localhost:5000");
+let client = socketio.io("http://localhost:5000");
 for (let j_index = 0; j_index <= outboundEvents.length-1; j_index++) {
   // When client sends messages most of them should be forwarded to the server.
   client.on(outboundEvents[j_index], (message) => {
