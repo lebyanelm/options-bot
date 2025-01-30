@@ -12,7 +12,6 @@ from pymongo import MongoClient
 from aiohttp import web
 
 
-# Connects to a MongoDB cloud database to store data and track orders
 def connect_database():
     try:
         client = MongoClient(host=config["MONGODB"])
@@ -22,7 +21,6 @@ def connect_database():
             logging.error(error)
 
 
-# Read a JSON configuration file with setting values
 def load_config():
     config = dict()
     try:
@@ -30,11 +28,19 @@ def load_config():
             config = json.load(config_file)
     except Exception as error:
         logging.error(error)
-    config["BALANCE"] = 0
+
+    config = append_session_config(config)    
     return config
 
     
-# Starts up a proxy server for connecting to the broker server
+def append_session_config(_config: dict) -> dict:
+    _config["SESSION_PROFIT"] = 0
+    _config["SESSION_ORDERS"] = 0
+    _config["SESSION_ACCURACY"] = 0
+    _config["SESSION_RISK"] = 0
+    return _config
+
+    
 node_process = None
 async def start_node_script(script_path):
     """
@@ -49,11 +55,11 @@ async def start_node_script(script_path):
         )
         logging.info("Node.js script started.")
 
-        # Optionally, read Node.js script output
         while True:
             line = await node_process.stdout.readline()
             if line:
-                logging.info(f"Node.js: {line.decode().strip()}")
+                # logging.info(f"Node.js: {line.decode().strip()}")
+                pass
             elif node_process.poll() is not None:
                 break
     except Exception as e:
@@ -64,12 +70,10 @@ async def start_node_script(script_path):
             logging.info("Node.js script terminated.")
 
 
-# Asyncronously run the server
 async def run_server(app):
     """
     Starts the server and launches the Node.js script once the server is ready.
     """
-    # Start the web server
     logging.getLogger('aiohttp.access').setLevel(logging.WARNING)
     runner = web.AppRunner(app)
     await runner.setup()
@@ -78,10 +82,8 @@ async def run_server(app):
 
     logging.info("Server started and ready to accept connections.")
 
-    # Start the Node.js script after the server is ready
     asyncio.create_task(start_node_script(config["PROXY_SCRIPT"]))
 
-    # Keep the server running
     try:
         await asyncio.Event().wait()
     except asyncio.CancelledError:
@@ -89,7 +91,6 @@ async def run_server(app):
         await runner.cleanup()
 
 
-# Register an exit clean-up routine to close opened threads
 def cleanup_routine():
     global node_process
     if node_process is not None:
@@ -103,7 +104,6 @@ def cleanup_routine():
 atexit.register(cleanup_routine)
 
 
-# Get latest historical data
 def load_candles(asset_id: str, _time = None) -> dict:
     index = get_random_request_id()
     period = config["PERIOD"]
@@ -120,7 +120,7 @@ def load_candles(asset_id: str, _time = None) -> dict:
         period = period,
         time = time_red
     )   
-    
+
 
 def last_time(timestamp, period):
     timestamp_redondeado = (timestamp // period) * period
@@ -173,7 +173,6 @@ def get_random_request_id():
     return int(float(t + rand))
     
 
-# Configure the helper module
 config = load_config()
 logging_level = logging.DEBUG if config["VERBOSITY"] == "debug" else logging.INFO
 if config["VERBOSITY"] == "":
