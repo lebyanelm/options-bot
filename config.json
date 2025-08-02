@@ -2,7 +2,7 @@
     "APP_NAME": "pocketoption-bot",
     "MODE": "demo",
     "PLATFORM": 3,
-    "VERBOSITY": "none",
+    "VERBOSITY": "info",
 
     "LIVE_SERVER": "https://api-eu.po.market",
     "DEMO_SERVER": "https://demo-api-eu.po.market",
@@ -19,9 +19,13 @@
 
     "MONGODB": "mongodb+srv://lebyanelm:Hzk9cbBGSN2cbqld@pocketoption-bot.xhuos.mongodb.net/?retryWrites=true&w=majority&appName=pocketoption-bot",
 
-    "TARGET_SYMBOLS": ["#AAPL_otc"],
+    "TARGET_SYMBOLS": [],
+    "MAXIMUM_SYMBOLS": 8,
     "PERIOD": 30,
-    "EXPIRY": 1,
-    "CANDLES_LIMIT": 6000,
-    "BALANCE_AT_RISK": 0.05
+    "MIN_TIMEFRAME": 1,
+    "MAX_TIMEFRAME": 240,
+    "CANDLES_LIMIT": 10000,
+    "BALANCE_AT_RISK": 0.1,
+    "MAX_LOOK_BACK_COUNT": 10,
+    "MIN_PAYOUT": 0.6
 }

@@ -56,7 +56,9 @@ const inboundEvents = [
   "successcloseOrder", "successopenOrder", "failopenOrder",
   "updateHistory", "connect_error", "reconnect_error",
   "reconnect_failed", "updateBalance", "price-alert/load", "favorite/load",
-  "updateClosedDeals", "updateOpenedDeals"
+  "updateClosedDeals", "updateOpenedDeals", "successprice-alert/update",
+  "successupdatePending", "successopenPendingOrder", "successprice-alert/load",
+  "successpending/created", "updateAssets"
 ];
 let isAuthenticated = false;
 for (let index = 0; index <= inboundEvents.length - 1; index++) {
@@ -70,6 +72,9 @@ for (let index = 0; index <= inboundEvents.length - 1; index++) {
 
       if (inboundEvents[index] == "successauth") {
         isAuthenticated = true;
+        setInterval(() => {
+          server.emit("ps");
+        }, 60000)
       }
     } else if (inboundEvents[index] === "connect") {
       // Meaning that we have been prevously disconnected, now a new connection has been made.
@@ -91,7 +96,8 @@ const outboundEvents = [
   "connect", "disconnect", "favorite/change",
   "changeSymbol", "auth", "loadHistoryPeriod",
   "openOrder", "cancelOrder", "price-alert/add",
-  "price-alert/remove"
+  "price-alert/remove", "price-alert/load",
+  "openPendingOrder", "cancelPendingOrder"
 ]
 let client = socketio.io("http://localhost:5000");
 for (let j_index = 0; j_index <= outboundEvents.length-1; j_index++) {

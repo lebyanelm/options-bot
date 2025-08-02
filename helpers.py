@@ -7,6 +7,7 @@ import atexit
 import random
 import time
 import datetime
+import numpy as np
 from time_sync import timesync
 from pymongo import MongoClient
 from aiohttp import web
@@ -60,8 +61,6 @@ async def start_node_script(script_path):
             if line:
                 # logging.info(f"Node.js: {line.decode().strip()}")
                 pass
-            elif node_process.poll() is not None:
-                break
     except Exception as e:
         logging.error(f"Error running Node.js script: {e}")
     finally:
@@ -91,7 +90,7 @@ async def run_server(app):
         await runner.cleanup()
 
 
-def cleanup_routine():
+def cleanup_routine(pending_orders, socketio_server):
     global node_process
     if node_process is not None:
         try:
@@ -101,7 +100,12 @@ def cleanup_routine():
         except Exception as e:
             logging.error(f"Error during cleanup: {e}")
     logging.info("Running cleanup routine.")
-atexit.register(cleanup_routine)
+
+    # Cancel any pending orders left
+    # for pending_order in pending_orders:
+    #     socketio_server.emit("cancelPendingOrder", dict(ticket = pending_order["ticket"]))
+    #     pending_orders.remove(pending_order)
+    # logging.info("Pending orders cleared before exit.")
 
 
 def load_candles(asset_id: str, _time = None) -> dict:
@@ -145,25 +149,51 @@ def get_period_offset(period):
     return 0;
     
     
-async def add_price_alert(sio: socketio.AsyncServer, asset_id: str, price: float):
-    await sio.emit("price-alert/add", dict(price=price, assetId=asset_id))
-    
 
-def get_order_params(asset_id: str, order_type: str) -> dict:
-    request_id = get_random_request_id()
-    timezone_offset = datetime.timedelta(hours=2)
-    expiry_offset = datetime.timedelta(minutes=config["EXPIRY"])
-    now = datetime.datetime.now()
-    close_at = (now + timezone_offset) + expiry_offset
-    return dict(
-        asset = asset_id,
-        requestId = request_id,
-        optionType = 100,
-        isDemo = 1 if config["MODE"] == "demo" else 0,
-        action = order_type,
-        amount = config["BALANCE"] * config["BALANCE_AT_RISK"],
-        closeAt = close_at.timestamp()
-    )
+import numpy as np
+
+def average_time_above_pivot(ohlc_data, pivot_point, direction=0):
+    """
+    Determines the average number of candles price stays above (for calls) or below (for puts) 
+    the pivot point before breaking.
+
+    :param ohlc_data: List of dictionaries with OHLCV data (each representing a candle).
+                      Example format: [{"open": 1.2, "high": 1.3, "low": 1.1, "close": 1.25}, ...]
+    :param pivot_point: The calculated pivot level.
+    :param direction: "call" for time above pivot, "put" for time below pivot.
+    :return: Average time (in number of candles) price remains above/below the pivot.
+    """
+    durations = []
+    current_duration = 0
+    in_position = False  # Tracks whether price is currently above/below the pivot
+    
+    for _, candle in ohlc_data.iterrows():
+        price_above = candle['close'] > pivot_point
+        price_below = candle['close'] < pivot_point
+
+        if direction == 0:
+            if price_above:
+                current_duration += 1
+                in_position = True
+            elif in_position:  # Break below pivot point
+                durations.append(current_duration)
+                current_duration = 0
+                in_position = False
+
+        elif direction == 1:
+            if price_below:
+                current_duration += 1
+                in_position = True
+            elif in_position:  # Break above pivot point
+                durations.append(current_duration)
+                current_duration = 0
+                in_position = False
+
+    # Append last duration if still in position
+    if in_position and current_duration > 0:
+        durations.append(current_duration)
+
+    return np.mean(durations) if durations else 0  # Return 0 if no durations recorded
 
     
 def get_random_request_id():
@@ -172,7 +202,51 @@ def get_random_request_id():
     t = str(cu + (2 * 60 * 60))
     return int(float(t + rand))
     
+    
+    
+def calculate_pivot_point(ohlc, bin_size=0.5, touch_tolerance=0.2):
+    """
+    Determines the most recurring pivot point and counts how many times it has been touched.
+    
+    Parameters:
+    - ohlc: DataFrame with columns ['high', 'low', 'close']
+    - bin_size: Rounding interval for grouping similar pivot points (default = 0.5)
+    - touch_tolerance: Allowed price deviation to consider a pivot "touched" (default = 0.2)
+    
+    Returns:
+    - most_frequent_pivot (float): The most recurring pivot level.
+    - touch_count (int): Number of times the pivot has been touched.
+    - breakout_probability (float): Estimated probability of a breakout.
+    """
+    # Compute Pivot Points
+    ohlc["pivot"] = (ohlc["high"] + ohlc["low"] + ohlc["close"]) / 3
 
+    # Round Pivot Points to the nearest bin_size to group similar levels
+    ohlc["pivot_rounded"] = np.round(ohlc["pivot"] / bin_size) * bin_size
+
+    # Find the most frequent pivot level
+    pivot_counts = ohlc["pivot_rounded"].value_counts()
+    most_frequent_pivot = pivot_counts.idxmax()  # Highest occurring pivot level
+
+    # Calculate the average pivot within this frequent range
+    recurring_pivots = ohlc[ohlc["pivot_rounded"] == most_frequent_pivot]["pivot"]
+    most_recurring_pivot = recurring_pivots.mean()
+
+    # Count how many times the pivot level was touched
+    touch_count = ((ohlc["low"] <= most_recurring_pivot + touch_tolerance) & 
+                   (ohlc["high"] >= most_recurring_pivot - touch_tolerance)).sum()
+
+    # Determine breakout probability based on touch frequency
+    if touch_count <= 2:
+        breakout_probability = 60 + np.random.randint(0, 11)  # 60-70% chance
+    elif 3 <= touch_count <= 4:
+        breakout_probability = 40 + np.random.randint(0, 21)  # 40-60% chance
+    else:
+        breakout_probability = 20 + np.random.randint(0, 21)  # 20-40% chance
+
+    return most_recurring_pivot, touch_count, breakout_probability
+
+        
 config = load_config()
 logging_level = logging.DEBUG if config["VERBOSITY"] == "debug" else logging.INFO
 if config["VERBOSITY"] == "":
